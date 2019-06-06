@@ -209,10 +209,10 @@ function struct<T>(clazz: { new (): T; read(reader: DataReader): T; }): { new ()
  * @param {number} type
  * @return {function(T, string)}
  */
-function field<T>(type: DataType): (proto: T, field: string) => void {
+function field<T>(type: DataType): (proto: any, field: string) => void {
 	let existingDecorator = fieldDecorators.get(type);
 	if (existingDecorator === undefined) {
-		existingDecorator = (proto: T, field: string) => {
+		existingDecorator = (proto: any, field: string) => {
 			const ctor: { __fields?: StructMemberDefinition[] } = proto.constructor;
 			if (ctor.__fields === undefined) {
 				ctor.__fields = [];

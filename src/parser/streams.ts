@@ -79,7 +79,7 @@ export class XhrStream implements Stream {
 	constructor(private _xhr: XMLHttpRequest) {
 		_xhr.addEventListener("progress", () => this._onXhrProgress(), false);
 		_xhr.addEventListener("load", () => this._onXhrLoad(), false);
-		_xhr.addEventListener("error", event => this._onXhrError(event), false);
+		_xhr.addEventListener("error", event => this._onXhrError(new ErrorEvent(event.toString())), false);
 	}
 
 	/**

@@ -287,12 +287,12 @@ var Run = (function () {
 
 		outputStream.push({
 			path: this._outputLibraryName + ".js",
-			contents: Buffer.concat([new Buffer(stream.toString()), new Buffer("\n//# sourceMappingURL=" + this._outputLibraryName + ".js.map")])
+			contents: Buffer.concat([Buffer.from(stream.toString()), Buffer.from("\n//# sourceMappingURL=" + this._outputLibraryName + ".js.map")])
 		});
 
 		outputStream.push({
 			path: this._outputLibraryName + ".js.map",
-			contents: new Buffer(this._rootSourceMap.get().toString())
+			contents: Buffer.from(this._rootSourceMap.get().toString())
 		});
 
 		// Print unused variables
@@ -416,7 +416,7 @@ module.exports = {
 				codeFile.path = codeFile.path.replace(/\.js$/, ".min.js");
 				sourceMapFile.path = sourceMapFile.path.replace(/\.js\.map$/, ".min.js.map");
 
-				codeFile.contents = Buffer.concat([new Buffer(stream.toString()), new Buffer("\n//# sourceMappingURL="), new Buffer(sourceMapFile.path)]);
+				codeFile.contents = Buffer.concat([Buffer.from(stream.toString()), Buffer.from("\n//# sourceMappingURL="), Buffer.from(sourceMapFile.path)]);
 				this.push(codeFile);
 
 				var inputSourceMapObject = JSON.parse(sourceMapFile.contents.toString());
@@ -425,7 +425,7 @@ module.exports = {
 					outputSourceMapObject.setSourceContent(filename, inputSourceMapObject.sourcesContent[i]);
 				});
 
-				sourceMapFile.contents = new Buffer(output.source_map.toString());
+				sourceMapFile.contents = Buffer.from(output.source_map.toString());
 				this.push(sourceMapFile);
 
 				codeFile = null;

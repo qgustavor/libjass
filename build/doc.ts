@@ -35,7 +35,7 @@ function flatten<T>(arr: T[][]): T[] {
 }
 
 const sorter = (() => {
-	function visibilitySorter(value1: { isPrivate?: boolean; isProtected?: boolean; }, value2: { isPrivate?: boolean; isProtected?: boolean; }) {
+	/*function visibilitySorter(value1: { isPrivate?: boolean; isProtected?: boolean; }, value2: { isPrivate?: boolean; isProtected?: boolean; }) {
 		if (value1.isPrivate === value2.isPrivate && value1.isProtected === value2.isProtected) {
 			return 0;
 		}
@@ -57,7 +57,7 @@ const sorter = (() => {
 		}
 
 		return 0;
-	}
+	}*/
 
 	const types = [AST.Property, AST.Function, AST.Interface, AST.Class, AST.Enum];
 	function typeSorter(value1: AST.ModuleMember | AST.NamespaceMember, value2: AST.ModuleMember | AST.NamespaceMember) {
@@ -81,7 +81,7 @@ const sorter = (() => {
 		return value1.name.localeCompare(value2.name);
 	}
 
-	const sorters: ((value1: AST.ModuleMember, value2: AST.ModuleMember) => number)[] = [visibilitySorter, typeSorter, nameSorter];
+	const sorters: ((value1: AST.ModuleMember, value2: AST.ModuleMember) => number)[] = [/*visibilitySorter, */typeSorter, nameSorter];
 
 	return (value1: AST.ModuleMember, value2: AST.ModuleMember) => {
 		for (const sorter of sorters) {

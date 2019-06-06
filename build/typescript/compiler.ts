@@ -39,7 +39,7 @@ function createCompilerHost(options: ts.CompilerOptions): StreamingCompilerHost 
 	host.writeFile = (fileName, data, writeByteOrderMark, onError?, sourceFiles?): void => {
 		_outputStream.push({
 			path: fileName,
-			contents: new Buffer(data)
+			contents: Buffer.from(data)
 		});
 	};
 
@@ -106,11 +106,11 @@ export class Compiler {
 		return this._program.getTypeChecker();
 	}
 
-	get sourceFiles(): ts.SourceFile[] {
+	get sourceFiles(): readonly ts.SourceFile[] {
 		return this._program.getSourceFiles();
 	}
 
-	private _reportDiagnostics(diagnostics: ts.Diagnostic[]) {
+	private _reportDiagnostics(diagnostics: readonly ts.DiagnosticWithLocation[]) {
 		for (const diagnostic of diagnostics) {
 			let message = "";
 
@@ -137,8 +137,9 @@ export function build(root: string, rootNamespaceName: string): FileTransform {
 
 		compiler.compile(projectConfigFile);
 
-		const walkResult = walk(compiler, root, rootNamespaceName);
-		addJSDocComments(walkResult.modules);
+		// BROKEN:
+		// const walkResult = walk(compiler, root, rootNamespaceName);
+		// addJSDocComments(walkResult.modules);
 
 		compiler.writeFiles(this);
 
@@ -243,7 +244,7 @@ class FakeSourceFile {
 
 	constructor(originalSourceFile: ts.SourceFile) {
 		this.text = originalSourceFile.text;
-		this.lineMap = ts.getLineStarts(originalSourceFile).slice();
+		this.lineMap = originalSourceFile.getLineStarts().slice();
 	}
 
 	addComment(originalComment: ts.CommentRange, newComments: string[]): ts.CommentRange & { sourceFile: FakeSourceFile } {
@@ -278,13 +279,15 @@ class FakeSourceFile {
 
 var fakeSourceFiles: { [name: string]: FakeSourceFile } = Object.create(null);
 
-export const oldGetLeadingCommentRangesOfNodeFromText: typeof ts.getLeadingCommentRangesOfNodeFromText = ts.getLeadingCommentRangesOfNodeFromText.bind(ts);
+export function oldGetLeadingCommentRangesOfNodeFromText(node: ts.Node, text: string) {
+	return ts.getLeadingCommentRanges(text, node.pos);
+}
 
 ts.getLeadingCommentRangesOfNodeFromText = (node: ts.Node, text: string) => {
 	const originalComments = oldGetLeadingCommentRangesOfNodeFromText(node, text);
 
 	if (originalComments !== undefined && (<any>node)["typescript-new-comment"] !== undefined) {
-		const sourceFileOfNode = ts.getSourceFileOfNode(node);
+		const sourceFileOfNode = node.getSourceFile();
 		let fakeSourceFile = fakeSourceFiles[sourceFileOfNode.fileName];
 		if (fakeSourceFile === undefined) {
 			fakeSourceFile = fakeSourceFiles[sourceFileOfNode.fileName] = new FakeSourceFile(sourceFileOfNode);
@@ -297,12 +300,12 @@ ts.getLeadingCommentRangesOfNodeFromText = (node: ts.Node, text: string) => {
 };
 
 var oldWriteCommentRange: typeof ts.writeCommentRange = ts.writeCommentRange.bind(ts);
-ts.writeCommentRange = (text: string, lineMap: number[], writer: ts.EmitTextWriter, comment: ts.CommentRange, newLine: string) => {
+ts.writeCommentRange = (text: string, lineMap: ReadonlyArray<number>, writer: ts.EmitTextWriter, commentPos: number, commentEnd: number, newLine: string) => {
 	if ((<{ sourceFile: ts.SourceFile }><any>comment).sourceFile) {
 		const currentSourceFile = (<{ sourceFile: ts.SourceFile }><any>comment).sourceFile;
 		text = currentSourceFile.text;
 		lineMap = currentSourceFile.lineMap;
 	}
 
-	return oldWriteCommentRange(text, lineMap, writer, comment, newLine);
+	return oldWriteCommentRange(text, lineMap, writer, commentPos, commentEnd, newLine);
 };

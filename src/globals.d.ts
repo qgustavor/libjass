@@ -74,17 +74,6 @@ interface Set<T> {
 	forEach(callbackfn: (value: T, index: T, set: this) => void, thisArg?: any): void;
 }
 
-interface SVGFEComponentTransferElement {
-	appendChild(newChild: SVGFEFuncAElement): SVGFEFuncAElement;
-	appendChild(newChild: SVGFEFuncBElement): SVGFEFuncBElement;
-	appendChild(newChild: SVGFEFuncGElement): SVGFEFuncGElement;
-	appendChild(newChild: SVGFEFuncRElement): SVGFEFuncRElement;
-}
-
-interface SVGFEMergeElement {
-	appendChild(newChild: SVGFEMergeNodeElement): SVGFEMergeNodeElement;
-}
-
 interface TextDecoder {
 	decode(input: ArrayBuffer | ArrayBufferView, options: { stream: boolean }): string;
 }

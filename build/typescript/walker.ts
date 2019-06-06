@@ -25,8 +25,12 @@ import { Compiler, oldGetLeadingCommentRangesOfNodeFromText } from "./compiler";
 
 import * as AST from "./ast";
 
-function hasModifier(node: ts.Node, flags: ts.NodeFlags): boolean {
-	return (node.flags & flags) !== 0;
+function hasModifier(node: ts.Node, flag: ts.SyntaxKind): boolean {
+	if (!node.modifiers) return false;
+	for (let modifier of node.modifiers) {
+		if (modifier.kind === flag) return true;
+	}
+	return false;
 }
 
 interface JSDoc {
@@ -186,18 +190,18 @@ class Walker {
 	}
 
 	private _visitProperty(node: ts.PropertyDeclaration, parent: AST.Class | AST.Interface) {
-		if (hasModifier(node, ts.NodeFlags.Private)) {
+		if (hasModifier(node, ts.SyntaxKind.PrivateKeyword)) {
 			return;
 		}
 
 		const jsDoc = this._parseJSDoc(node);
 
 		if (jsDoc.typeAnnotation === null) {
-			this._notifyIncorrectJsDoc(`Field ${ ts.getTextOfNode(node.name) } has no @type annotation.`);
+			this._notifyIncorrectJsDoc(`Field ${ node.getText() } has no @type annotation.`);
 			jsDoc.typeAnnotation = "*";
 		}
 
-		const property = this._scope.enter(new AST.Property(ts.getTextOfNode(node.name)));
+		const property = this._scope.enter(new AST.Property(node.getText()));
 		parent.members[property.name] = property;
 		property.getter = new AST.Getter(node, jsDoc.description, jsDoc.typeAnnotation, false);
 		property.setter = new AST.Setter(node, jsDoc.description, jsDoc.typeAnnotation, false);
@@ -208,21 +212,21 @@ class Walker {
 		const jsDoc = this._parseJSDoc(node);
 
 		const parameters = this._connectParameters(node.parameters, jsDoc.parameters,
-			parameterName => `Could not find @param annotation for ${ parameterName } on method ${ ts.getTextOfNode(node.name) }`
+			parameterName => `Could not find @param annotation for ${ parameterName } on method ${ node.getText() }`
 		);
 
 		if (jsDoc.returnType === null && (node.type === undefined || node.type.kind !== ts.SyntaxKind.VoidKeyword)) {
-			this._notifyIncorrectJsDoc(`Missing @return annotation for method ${ ts.getTextOfNode(node.name) }`);
+			this._notifyIncorrectJsDoc(`Missing @return annotation for method ${ node.getText() }`);
 			jsDoc.returnType = new AST.ReturnType("", "*");
 		}
 
-		const isPrivate = hasModifier(node, ts.NodeFlags.Private);
-		const isProtected = hasModifier(node, ts.NodeFlags.Protected);
-		const isStatic = hasModifier(node, ts.NodeFlags.Static);
+		const isPrivate = hasModifier(node, ts.SyntaxKind.PrivateKeyword);
+		const isProtected = hasModifier(node, ts.SyntaxKind.ProtectedKeyword);
+		const isStatic = hasModifier(node, ts.SyntaxKind.StaticKeyword);
 
 		const generics = this._getGenericsOfSignatureDeclaration(node);
 
-		const method = this._scope.enter(new AST.Function(ts.getTextOfNode(node.name), node, jsDoc.description, generics, parameters, jsDoc.returnType, jsDoc.isAbstract, isPrivate, isProtected, isStatic));
+		const method = this._scope.enter(new AST.Function(node.getText(), node, jsDoc.description, generics, parameters, jsDoc.returnType, jsDoc.isAbstract, isPrivate, isProtected, isStatic));
 		parent.members[method.name] = method;
 		this._scope.leave();
 	}
@@ -230,9 +234,9 @@ class Walker {
 	private _visitGetAccessor(node: ts.AccessorDeclaration, clazz: AST.Class): void {
 		const jsDoc = this._parseJSDoc(node);
 
-		const name = ts.getTextOfNode(node.name);
+		const name = node.getText();
 
-		const isPrivate = hasModifier(node, ts.NodeFlags.Private);
+		const isPrivate = hasModifier(node, ts.SyntaxKind.PrivateKeyword);
 
 		let property = clazz.members[name] as AST.Property;
 		if (property === undefined) {
@@ -253,9 +257,9 @@ class Walker {
 	private _visitSetAccessor(node: ts.AccessorDeclaration, clazz: AST.Class): void {
 		const jsDoc = this._parseJSDoc(node);
 
-		const name = ts.getTextOfNode(node.name);
+		const name = node.getText();
 
-		const isPrivate = hasModifier(node, ts.NodeFlags.Private);
+		const isPrivate = hasModifier(node, ts.SyntaxKind.PrivateKeyword);
 
 		let property = clazz.members[name] as AST.Property;
 		if (property === undefined) {
@@ -279,7 +283,7 @@ class Walker {
 		}
 
 		const declaration = node.declarationList.declarations[0];
-		if (hasModifier(declaration, ts.NodeFlags.Ambient)) {
+		if ((declaration.flags & ts.NodeFlags.Ambient) !== 0) {
 			return;
 		}
 
@@ -288,7 +292,7 @@ class Walker {
 			return;
 		}
 
-		const property = this._scope.enter(new AST.Property(ts.getTextOfNode(declaration.name)));
+		const property = this._scope.enter(new AST.Property(declaration.getText()));
 		property.getter = new AST.Getter(node, jsDoc.description, jsDoc.typeAnnotation, false);
 
 		parent.members[property.name] = property;
@@ -299,7 +303,7 @@ class Walker {
 	private _visitFunctionDeclaration(node: ts.FunctionDeclaration, parent: AST.Module): void {
 		const jsDoc = this._parseJSDoc(node);
 
-		const isPrivate = !hasModifier(node, ts.NodeFlags.Export);
+		const isPrivate = !hasModifier(node, ts.SyntaxKind.ExportKeyword);
 
 		const generics = this._getGenericsOfSignatureDeclaration(node);
 
@@ -330,7 +334,7 @@ class Walker {
 
 		const generics = this._getGenericsOfInterfaceType(type);
 
-		const baseTypeHeritageClauseElement = ts.getClassExtendsHeritageClauseElement(node) || null;
+		const baseTypeHeritageClauseElement = ts.getClassExtendsHeritageElement(node) || null;
 		let baseType: AST.UnresolvedType = null;
 		if (baseTypeHeritageClauseElement !== null) {
 			baseType = new AST.UnresolvedType(
@@ -344,12 +348,12 @@ class Walker {
 			this._getGenericsOfTypeReferenceNode(type, generics)
 		));
 
-		const isPrivate = !hasModifier(node, ts.NodeFlags.Export);
+		const isPrivate = !hasModifier(node, ts.SyntaxKind.ExportKeyword);
 
 		let parameters: AST.Parameter[] = [];
 
-		if (type.symbol.members["__constructor"] !== undefined) {
-			parameters = this._connectParameters((type.symbol.members["__constructor"].declarations[0] as ts.ConstructorDeclaration).parameters, jsDoc.parameters,
+		if (type.symbol.members.get("__constructor" as ts.__String) !== undefined) {
+			parameters = this._connectParameters((type.symbol.members.get("__constructor" as ts.__String).declarations[0] as ts.ConstructorDeclaration).parameters, jsDoc.parameters,
 				parameterName => `Could not find @param annotation for ${ parameterName } on constructor in class ${ node.name.text }`
 			);
 		}
@@ -361,7 +365,7 @@ class Walker {
 
 		parent.members[clazz.name] = clazz;
 
-		ts.forEachProperty(type.symbol.exports, symbol => {
+		type.symbol.exports.forEach((symbol: ts.Symbol) => {
 			if (symbol.name === "prototype") {
 				return;
 			}
@@ -371,7 +375,7 @@ class Walker {
 			}
 		});
 
-		ts.forEachProperty(type.symbol.members, symbol => {
+		type.symbol.members.forEach((symbol: ts.Symbol) => {
 			for (const declaration of symbol.declarations) {
 				this._walkClassMember(declaration, clazz);
 			}
@@ -397,12 +401,12 @@ class Walker {
 			return;
 		}
 
-		const isPrivate = !hasModifier(node, ts.NodeFlags.Export);
+		const isPrivate = !hasModifier(node, ts.SyntaxKind.ExportKeyword);
 
 		const interfase = this._scope.enter(new AST.Interface(node.name.text, node, jsDoc.description, generics, baseTypes, isPrivate));
 		parent.members[interfase.name] = interfase;
 
-		ts.forEachProperty(type.symbol.members, symbol => {
+		type.symbol.members.forEach((symbol: ts.Symbol) => {
 			for (const declaration of symbol.declarations) {
 				this._walkInterfaceMember(declaration, interfase);
 			}
@@ -419,14 +423,14 @@ class Walker {
 			return;
 		}
 
-		const isPrivate = !hasModifier(node, ts.NodeFlags.Export);
+		const isPrivate = !hasModifier(node, ts.SyntaxKind.ExportKeyword);
 
 		const type = this._typeChecker.getTypeAtLocation(node);
 
 		const enumType = this._scope.enter(new AST.Enum(node.name.text, node, jsDoc.description, isPrivate));
 		parent.members[enumType.name] = enumType;
 
-		ts.forEachProperty(type.symbol.exports, symbol => {
+		type.symbol.exports.forEach((symbol: ts.Symbol) => {
 			this._visitEnumMember(symbol.declarations[0] as ts.EnumMember, enumType);
 		});
 
@@ -438,7 +442,7 @@ class Walker {
 
 		const value = (node.initializer === undefined) ? null : parseInt((node.initializer as ts.LiteralExpression).text);
 
-		const enumMember = this._scope.enter(new AST.EnumMember(ts.getTextOfNode(node.name), (jsDoc === null) ? "" : jsDoc.description, value));
+		const enumMember = this._scope.enter(new AST.EnumMember(node.getText(), (jsDoc === null) ? "" : jsDoc.description, value));
 
 		parent.members.push(enumMember);
 
@@ -681,7 +685,7 @@ class Walker {
 		});
 	}
 
-	private _connectParameters(astParameters: ts.ParameterDeclaration[], jsDocParameters: { [name: string]: AST.Parameter }, onMissingMessageCallback: (parameterName: string) => string) {
+	private _connectParameters(astParameters: ts.NodeArray<ts.ParameterDeclaration>, jsDocParameters: { [name: string]: AST.Parameter }, onMissingMessageCallback: (parameterName: string) => string) {
 		return astParameters.map(parameter => {
 			let parameterName = (parameter.name as ts.Identifier).text;
 			if (parameterName[0] === "_") {

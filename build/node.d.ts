@@ -9,6 +9,9 @@ declare var require: {
 
 interface BufferConstructor {
 	new (str: string): Buffer;
+	from (arrayBuffer: ArrayBuffer, byteOffset?: number, length?: number): Buffer;
+	from (str: string, encoding?: string): Buffer;
+	from (data: ReadonlyArray<any> | Buffer): Buffer;
 	prototype: Buffer;
 	concat(list: Buffer[]): Buffer;
 }
